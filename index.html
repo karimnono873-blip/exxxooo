@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard RTOS - Édition Master</title>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --panel-bg: #1e1e1e;
+            --text-main: #e0e0e0;
+            --accent-blue: #007acc;
+            --accent-green: #4caf50;
+            --accent-red: #f44336;
+            --accent-orange: #ff9800;
+            --border-color: #333;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            width: 100%;
+            max-width: 1000px;
+            border-bottom: 2px solid var(--accent-blue);
+            padding-bottom: 10px;
+        }
+
+        .header h1 { margin: 0; font-size: 24px; color: var(--accent-blue); }
+        .header p { margin: 5px 0 0 0; font-size: 14px; color: #888; }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+            width: 100%;
+            max-width: 1000px;
+        }
+
+        .panel {
+            background-color: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .panel h2 {
+            margin-top: 0;
+            font-size: 18px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+            color: var(--text-main);
+        }
+
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            background-color: #2d2d2d;
+            color: white;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: left;
+            font-weight: bold;
+        }
+
+        .btn:hover { background-color: #3d3d3d; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .btn.priority-high { border-left: 4px solid var(--accent-red); }
+        .btn.priority-med { border-left: 4px solid var(--accent-orange); }
+        .btn.priority-low { border-left: 4px solid var(--accent-green); }
+
+        /* Architecture Visualizer */
+        .architecture {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            position: relative;
+        }
+
+        .layer {
+            width: 100%;
+            padding: 15px;
+            border: 1px dashed #555;
+            border-radius: 6px;
+            text-align: center;
+            position: relative;
+        }
+
+        .layer-title {
+            position: absolute;
+            top: -10px;
+            left: 15px;
+            background: var(--panel-bg);
+            padding: 0 10px;
+            font-size: 12px;
+            color: #aaa;
+        }
+
+        .nodes-container {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 10px;
+        }
+
+        .node {
+            background: #2a2a2a;
+            padding: 10px 20px;
+            border-radius: 4px;
+            border: 2px solid #444;
+            transition: all 0.3s;
+            z-index: 2;
+        }
+
+        .node.active { border-color: var(--accent-blue); box-shadow: 0 0 10px var(--accent-blue); }
+
+        .mutex {
+            background: var(--accent-green);
+            color: #000;
+            padding: 10px 30px;
+            border-radius: 20px;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+
+        .mutex.locked {
+            background: var(--accent-red);
+            color: white;
+        }
+
+        .bus-line {
+            width: 80%;
+            height: 4px;
+            background: #555;
+            margin: 10px auto;
+            position: relative;
+        }
+
+        .bus-line::before, .bus-line::after {
+            content: '';
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: #555;
+            border-radius: 50%;
+            top: -3px;
+        }
+        .bus-line::before { left: -5px; }
+        .bus-line::after { right: -5px; }
+
+        .data-packet {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: var(--accent-blue);
+            border-radius: 50%;
+            top: -4px;
+            opacity: 0;
+            transition: left 1s linear, opacity 0.2s;
+        }
+
+        /* Closed Loop Indicator */
+        .closed-loop-diagram {
+            margin-top: 20px;
+            padding: 15px;
+            background: #1a2630;
+            border-left: 4px solid var(--accent-blue);
+            border-radius: 4px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .status-log {
+            margin-top: 15px;
+            height: 120px;
+            background: #000;
+            color: #0f0;
+            font-family: monospace;
+            padding: 10px;
+            overflow-y: auto;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Analyse Système Embarqué : Robotique RTOS</h1>
+        <p>Interface interactive de validation des concepts (Boucle fermée, Ordonnancement, Mutex I2C)</p>
+    </div>
+
+    <div class="dashboard">
+        <div class="panel">
+            <h2>Simulateur d'Événements</h2>
+            <button class="btn priority-high" id="btn-acq" onclick="triggerTask('acq')">
+                [Prio Haute] Interruption Capteur
+            </button>
+            <button class="btn priority-med" id="btn-proc" onclick="triggerTask('proc')">
+                [Prio Moyenne] Calcul Erreur (Boucle Fermée)
+            </button>
+            <button class="btn priority-low" id="btn-store" onclick="triggerTask('store')">
+                [Prio Basse] Sauvegarde EEPROM
+            </button>
+
+            <div class="status-log" id="log">
+                > Système initialisé...<br>
+                > RTOS Scheduler prêt.<br>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>Architecture Matérielle & Logicielle</h2>
+            <div class="architecture">
+                
+                <div class="layer">
+                    <span class="layer-title">Espace Logiciel (FreeRTOS)</span>
+                    <div class="nodes-container">
+                        <div class="node" id="node-acq">Tâche Acquisition</div>
+                        <div class="node" id="node-proc">Tâche Traitement</div>
+                        <div class="node" id="node-store">Tâche Stockage</div>
+                    </div>
+                </div>
+
+                <div class="layer" style="border-color: transparent;">
+                    <div class="mutex" id="mutex-i2c">MUTEX I2C : LIBRE (Give)</div>
+                </div>
+
+                <div class="layer">
+                    <span class="layer-title">Espace Matériel (Périphériques)</span>
+                    <div class="bus-line">
+                        <div class="data-packet" id="packet"></div>
+                    </div>
+                    <div class="nodes-container">
+                        <div class="node hardware">Capteurs (Ultrason/Gyro)</div>
+                        <div class="node hardware">Mémoire (EEPROM)</div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="closed-loop-diagram">
+                <strong>Principe de la Boucle Fermée :</strong> Le système interroge continuellement les capteurs (Acquisition) pour obtenir un retour (Feedback) sur l'environnement. L'erreur est calculée (Traitement) pour ajuster les commandes, indépendamment du stockage des données en arrière-plan.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const mutexEl = document.getElementById('mutex-i2c');
+        const packetEl = document.getElementById('packet');
+        const logEl = document.getElementById('log');
+        let isMutexLocked = false;
+
+        function log(message) {
+            logEl.innerHTML += `> ${message}<br>`;
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        function lockMutex(taskName) {
+            isMutexLocked = true;
+            mutexEl.classList.add('locked');
+            mutexEl.innerText = `MUTEX I2C : VERROUILLÉ (Take) par ${taskName}`;
+            disableButtons(true);
+        }
+
+        function unlockMutex() {
+            isMutexLocked = false;
+            mutexEl.classList.remove('locked');
+            mutexEl.innerText = `MUTEX I2C : LIBRE (Give)`;
+            disableButtons(false);
+        }
+
+        function disableButtons(state) {
+            document.getElementById('btn-acq').disabled = state;
+            document.getElementById('btn-store').disabled = state;
+        }
+
+        function animateData(direction, callback) {
+            packetEl.style.opacity = '1';
+            if (direction === 'read') {
+                packetEl.style.left = '10%';
+                setTimeout(() => { packetEl.style.left = '50%'; }, 50);
+            } else {
+                packetEl.style.left = '50%';
+                setTimeout(() => { packetEl.style.left = '90%'; }, 50);
+            }
+            
+            setTimeout(() => {
+                packetEl.style.opacity = '0';
+                callback();
+            }, 1000);
+        }
+
+        function triggerTask(type) {
+            if (isMutexLocked && type !== 'proc') {
+                log(`[Alerte] Tâche bloquée, Mutex non disponible.`);
+                return;
+            }
+
+            // Reset active states
+            document.querySelectorAll('.node').forEach(el => el.classList.remove('active'));
+
+            if (type === 'acq') {
+                document.getElementById('node-acq').classList.add('active');
+                log("xSemaphoreTake(MutexI2C, portMAX_DELAY) appelé.");
+                lockMutex("Acquisition");
+                log("Lecture des capteurs via I2C en cours...");
+                
+                animateData('read', () => {
+                    log("xSemaphoreGive(MutexI2C) appelé. Lecture terminée.");
+                    unlockMutex();
+                    document.getElementById('node-acq').classList.remove('active');
+                    // Automatically trigger processing after acquisition (closed loop behavior)
+                    setTimeout(() => triggerTask('proc'), 500);
+                });
+            } 
+            else if (type === 'store') {
+                document.getElementById('node-store').classList.add('active');
+                log("xSemaphoreTake(MutexI2C, portMAX_DELAY) appelé.");
+                lockMutex("Stockage");
+                log("Écriture dans l'EEPROM via I2C en cours...");
+                
+                animateData('write', () => {
+                    log("xSemaphoreGive(MutexI2C) appelé. Écriture terminée.");
+                    unlockMutex();
+                    document.getElementById('node-store').classList.remove('active');
+                });
+            }
+            else if (type === 'proc') {
+                document.getElementById('node-proc').classList.add('active');
+                log("Calcul de l'erreur (Feedback boucle fermée).");
+                log("Génération de la nouvelle consigne...");
+                setTimeout(() => {
+                    document.getElementById('node-proc').classList.remove('active');
+                }, 1000);
+            }
+        }
+    </script>
+</body>
+</html>
